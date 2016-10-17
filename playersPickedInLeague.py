@@ -3,6 +3,10 @@ import json
 import csv
 import argparse
 
+
+# python playersPickedInLeague.py --league 336217 --gameweek 2 --type classic or 
+# python playersPickedInLeague.py -l 336217 -g 2 -t classic. For h2h leagues, replace classic with h2h
+
 FPL_URL = "https://fantasy.premierleague.com/drf/"
 USER_SUMMARY_SUBURL = "element-summary/"
 LEAGUE_CLASSIC_STANDING_SUBURL = "leagues-classic-standings/"
@@ -74,10 +78,13 @@ def writeToFile(countOfplayersPicked, fileName):
 # Main Script
 
 parser = argparse.ArgumentParser(description='Get players picked in your league in a certain GameWeek')
-parser.add_argument('-l','--league', help='league entry id', required=True)
-parser.add_argument('-g','--gameweek', help='gameweek number', required=True)
-parser.add_argument('-t', '--type', help='league type')
-args = vars(parser.parse_args())
+#parser.add_argument('-l','--league', help='league entry id', required=True)
+#parser.add_argument('-gw','--gameweek', help='gameweek number', required=True)
+#parser.add_argument('-t', '--type', help='league type')
+league = raw_input("Enter League ID (e.g. 5320): ")
+gameweek = raw_input("Enter GW number (e.g. 2): ")
+type = raw_input("Enter league type(h2h or classic): ")
+#args = vars(parser.parse_args())
 
 getPlayersInfo()
 playerElementIdToNameMap = {}
@@ -89,16 +96,17 @@ countOfplayersPicked = {}
 countOfCaptainsPicked = {}
 totalNumberOfPlayersCount = 0
 pageCount = START_PAGE
-GWNumber = args['gameweek']
-leagueIdSelected = args['league']
+GWNumber = gameweek
+leagueIdSelected = league
 
-if args['type'] == "h2h":
+if type is 'h2h':
     leagueStandingUrl = FPL_URL + LEAGUE_H2H_STANDING_SUBURL
     print("h2h league mode")
 else:
     leagueStandingUrl = FPL_URL + LEAGUE_CLASSIC_STANDING_SUBURL
     print("classic league mode")
 
+# Grab data from the full link as specified
 while (True):
     try:
         entries = getUserEntryIds(leagueIdSelected, pageCount, leagueStandingUrl)
@@ -107,8 +115,7 @@ while (True):
             break
 
         totalNumberOfPlayersCount += len(entries)
-        print("parsing pageCount: " + str(pageCount) + " with total number of players so far:" + str(
-            totalNumberOfPlayersCount))
+        print("pageCount: " + str(pageCount) + " total number of players: " + str(totalNumberOfPlayersCount))
         for entry in entries:
             elements, captainId = getplayersPickedForEntryId(entry, GWNumber)
             for element in elements:
@@ -130,6 +137,7 @@ while (True):
         writeToFile(listOfCountOfCaptainsPicked, "Captains " + str(leagueIdSelected) + ".csv")
 
         pageCount += 1
+
     except Exception as e:
         print(e)
         pass
