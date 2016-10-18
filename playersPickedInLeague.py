@@ -39,7 +39,10 @@ def getUserEntryIds(league_id, ls_page, league_Standing_Url):
 
     entries = []
 
+    print standings
+
     for player in standings:
+        print (player["player_name"] + " team " + player["entry_name"])
         entries.append(player["entry"])
 
     return entries
@@ -83,7 +86,7 @@ parser = argparse.ArgumentParser(description='Get players picked in your league 
 #parser.add_argument('-t', '--type', help='league type')
 league = raw_input("Enter League ID (e.g. 5320): ")
 gameweek = raw_input("Enter GW number (e.g. 2): ")
-type = raw_input("Enter league type(h2h or classic): ")
+type = raw_input("Enter league type (h2h or classic): ")
 #args = vars(parser.parse_args())
 
 getPlayersInfo()
@@ -101,10 +104,10 @@ leagueIdSelected = league
 
 if type is 'h2h':
     leagueStandingUrl = FPL_URL + LEAGUE_H2H_STANDING_SUBURL
-    print("h2h league mode")
+    print("H2H league")
 else:
     leagueStandingUrl = FPL_URL + LEAGUE_CLASSIC_STANDING_SUBURL
-    print("classic league mode")
+    print("Classic league mode")
 
 # Grab data from the full link as specified
 while (True):
