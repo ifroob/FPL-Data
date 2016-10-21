@@ -1,11 +1,13 @@
 import requests
 import json
 import csv
+import sys
 import argparse
+from time import gmtime, strftime
 
+import xlsxwriter
+import random
 
-# python playersPickedInLeague.py --league 336217 --gameweek 2 --type classic or 
-# python playersPickedInLeague.py -l 336217 -g 2 -t classic. For h2h leagues, replace classic with h2h
 
 FPL_URL = "https://fantasy.premierleague.com/drf/"
 USER_SUMMARY_SUBURL = "element-summary/"
@@ -18,6 +20,16 @@ PLAYERS_INFO_FILENAME = "allPlayersInfo.json"
 USER_SUMMARY_URL = FPL_URL + USER_SUMMARY_SUBURL
 PLAYERS_INFO_URL = FPL_URL + PLAYERS_INFO_SUBURL
 START_PAGE = 1
+
+
+def getLeagueInfo(league_id,league_Standing_Url) :
+	league_url = league_Standing_Url + str(league_id) 
+	r = requests.get(league_url)
+	jsonResponse = r.json()
+	#print jsonResponse
+	leagueName = jsonResponse["league"]["name"]
+	return leagueName
+
 
 # Download all player data: https://fantasy.premierleague.com/drf/bootstrap-static
 def getPlayersInfo():
@@ -34,35 +46,43 @@ def getUserEntryIds(league_id, ls_page, league_Standing_Url):
     jsonResponse = r.json()
     standings = jsonResponse["standings"]["results"]
     if not standings:
-        print("no more standings found!")
+        print("\nSuccess: Finished looking through all of the standings!")
         return None
 
     entries = []
 
-    print standings
-
+    # print standings
+    i = 1
     for player in standings:
-        print (player["player_name"] + " team " + player["entry_name"])
+        print (str(i) + ") " + player["player_name"] + " team " + player["entry_name"])
         entries.append(player["entry"])
+        i = i + 1
 
     return entries
 
 
 # team picked by user. example: https://fantasy.premierleague.com/drf/entry/2677936/event/1/picks with 2677936 being entry_id of the player
+# takes in a user entry id and gets their team
 def getplayersPickedForEntryId(entry_id, GWNumber):
-    eventSubUrl = "event/" + str(GWNumber) + "/picks"
-    playerTeamUrlForSpecificGW = FPL_URL + TEAM_ENTRY_SUBURL + str(entry_id) + "/" + eventSubUrl
-    r = requests.get(playerTeamUrlForSpecificGW)
-    jsonResponse = r.json()
-    picks = jsonResponse["picks"]
-    elements = []
-    captainId = 1
-    for pick in picks:
-        elements.append(pick["element"])
-        if pick["is_captain"]:
-            captainId = pick["element"]
+    try:
+	    eventSubUrl = "event/" + str(GWNumber) + "/picks"
+	    playerTeamUrlForSpecificGW = FPL_URL + TEAM_ENTRY_SUBURL + str(entry_id) + "/" + eventSubUrl
+	    r = requests.get(playerTeamUrlForSpecificGW)
+	    jsonResponse = r.json()
+	    picks = jsonResponse["picks"]
+	    elements = []
+	    captainId = 1
+	    for pick in picks:
+	        elements.append(pick["element"])
+	        if pick["is_captain"]:	
+	            captainId = pick["element"]
+	    
+	    return elements, captainId
 
-    return elements, captainId
+    except ValueError:
+    	print 'Exiting because decoding JSON has failed on team ' + str(entry_id)
+    	sys.exit()
+
 
 # read player info from the json file that we downlaoded
 def getAllPlayersDetailedJson():
@@ -73,9 +93,19 @@ def getAllPlayersDetailedJson():
 # writes the results to csv file
 def writeToFile(countOfplayersPicked, fileName):
     with open(fileName, 'w') as out:
+        
         csv_out = csv.writer(out)
-        csv_out.writerow(['Name', 'Num'])
+        
+        if len(countOfplayersPicked) == len(countOfCaptainsPicked) :
+        	csv_out.writerow(['Captains'])
+        else :
+        	csv_out.writerow([' '])
+        	csv_out.writerow(['Players'])
+
+        csv_out.writerow(['Name', '# Times Picked'])
+        
         for row in countOfplayersPicked:
+            # print row
             csv_out.writerow(row)
 
 # Main Script
@@ -84,9 +114,11 @@ parser = argparse.ArgumentParser(description='Get players picked in your league 
 #parser.add_argument('-l','--league', help='league entry id', required=True)
 #parser.add_argument('-gw','--gameweek', help='gameweek number', required=True)
 #parser.add_argument('-t', '--type', help='league type')
+
+print "\n" + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + "\n"
 league = raw_input("Enter League ID (e.g. 5320): ")
 gameweek = raw_input("Enter GW number (e.g. 2): ")
-type = raw_input("Enter league type (h2h or classic): ")
+type = raw_input("Enter league type (classic or h2h): ")
 #args = vars(parser.parse_args())
 
 getPlayersInfo()
@@ -102,27 +134,35 @@ pageCount = START_PAGE
 GWNumber = gameweek
 leagueIdSelected = league
 
-if type is 'h2h':
+if type == "h2h":
     leagueStandingUrl = FPL_URL + LEAGUE_H2H_STANDING_SUBURL
     print("H2H league")
 else:
     leagueStandingUrl = FPL_URL + LEAGUE_CLASSIC_STANDING_SUBURL
     print("Classic league mode")
 
+leagueName = getLeagueInfo(leagueIdSelected, leagueStandingUrl)
+print "\n\t\t" + leagueName + "\n"
+
 # Grab data from the full link as specified
 while (True):
     try:
         entries = getUserEntryIds(leagueIdSelected, pageCount, leagueStandingUrl)
+        # print entries
         if entries is None:
-            print("breaking as no more player entries")
+     		# no more players to look at
             break
 
         totalNumberOfPlayersCount += len(entries)
-        print("pageCount: " + str(pageCount) + " total number of players: " + str(totalNumberOfPlayersCount))
+        print("\npageCount: " + str(pageCount) + " total number of players: " + str(totalNumberOfPlayersCount))
+        
+        # Goes through each player id and finds team
+
         for entry in entries:
             elements, captainId = getplayersPickedForEntryId(entry, GWNumber)
             for element in elements:
                 name = playerElementIdToNameMap[element]
+                # print element
                 if name in countOfplayersPicked:
                     countOfplayersPicked[name] += 1
                 else:
@@ -134,10 +174,16 @@ while (True):
             else:
                 countOfCaptainsPicked[captainName] = 1
 
-        listOfcountOfplayersPicked = sorted(countOfplayersPicked.items(), key=lambda x: x[1], reverse=True)
-        writeToFile(listOfcountOfplayersPicked, "PlayersPicked " + str(leagueIdSelected) + ".csv")
+        
+
         listOfCountOfCaptainsPicked = sorted(countOfCaptainsPicked.items(), key=lambda x: x[1], reverse=True)
-        writeToFile(listOfCountOfCaptainsPicked, "Captains " + str(leagueIdSelected) + ".csv")
+        listOfcountOfplayersPicked = sorted(countOfplayersPicked.items(), key=lambda x: x[1], reverse=True)
+
+        writeToFile(listOfCountOfCaptainsPicked, "GW " + str(GWNumber) + " CaptainsPicked " + str(leagueIdSelected) + ".csv")
+        writeToFile(listOfcountOfplayersPicked, "GW " + str(GWNumber) + " PlayersPicked " + str(leagueIdSelected) + ".csv")
+
+
+       	#writeToFile(listOfCountOfCaptainsPicked, "file.xlsx")
 
         pageCount += 1
 
