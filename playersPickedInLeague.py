@@ -41,10 +41,14 @@ def getPlayersInfo():
 
 # Get users in league: https://fantasy.premierleague.com/drf/leagues-classic-standings/336217?phase=1&le-page=1&ls-page=5
 def getUserEntryIds(league_id, ls_page, league_Standing_Url):
+	# Get the URL from the PRESENT league standings.  This causes a problem whenever new users come into the league later on
     league_url = league_Standing_Url + str(league_id) + "?phase=1&le-page=1&ls-page=" + str(ls_page)
+    # print league_url
     r = requests.get(league_url)
     jsonResponse = r.json()
+    print jsonResponse
     standings = jsonResponse["standings"]["results"]
+    
     if not standings:
         print("\nSuccess: Finished looking through all of the standings!")
         return None
@@ -53,10 +57,14 @@ def getUserEntryIds(league_id, ls_page, league_Standing_Url):
 
     # print standings
     i = 1
+
     for player in standings:
-        print (str(i) + ") " + player["player_name"] + " team " + player["entry_name"])
-        entries.append(player["entry"])
-        i = i + 1
+    	isNew = player["last_rank"] # JSON field indicating if a player wasn't in the league before
+        print isNew 
+        if (isNew != 0) :
+	        print (str(i) + ") " + player["player_name"] + ": " + player["entry_name"])
+	        entries.append(player["entry"])
+	        i = i + 1
 
     return entries
 
@@ -64,7 +72,8 @@ def getUserEntryIds(league_id, ls_page, league_Standing_Url):
 # team picked by user. example: https://fantasy.premierleague.com/drf/entry/2677936/event/1/picks with 2677936 being entry_id of the player
 # takes in a user entry id and gets their team
 def getplayersPickedForEntryId(entry_id, GWNumber):
-    try:
+    
+    try :		    
 	    eventSubUrl = "event/" + str(GWNumber) + "/picks"
 	    playerTeamUrlForSpecificGW = FPL_URL + TEAM_ENTRY_SUBURL + str(entry_id) + "/" + eventSubUrl
 	    r = requests.get(playerTeamUrlForSpecificGW)
@@ -79,9 +88,11 @@ def getplayersPickedForEntryId(entry_id, GWNumber):
 	    
 	    return elements, captainId
 
-    except ValueError:
-    	print 'Exiting because decoding JSON has failed on team ' + str(entry_id)
-    	sys.exit()
+    except ValueError :
+    	# Maybe we can do something here where we exclude the team in which it fails on
+	    print 'Decoding failed on ' + str(entry_id)  
+    	# print 'Exiting because decoding JSON has failed on team ' + str(entry_id)
+    	# sys.exit()
 
 
 # read player info from the json file that we downlaoded
@@ -162,7 +173,6 @@ while (True):
             elements, captainId = getplayersPickedForEntryId(entry, GWNumber)
             for element in elements:
                 name = playerElementIdToNameMap[element]
-                # print element
                 if name in countOfplayersPicked:
                     countOfplayersPicked[name] += 1
                 else:
@@ -179,8 +189,8 @@ while (True):
         listOfCountOfCaptainsPicked = sorted(countOfCaptainsPicked.items(), key=lambda x: x[1], reverse=True)
         listOfcountOfplayersPicked = sorted(countOfplayersPicked.items(), key=lambda x: x[1], reverse=True)
 
-        writeToFile(listOfCountOfCaptainsPicked, "GW " + str(GWNumber) + " CaptainsPicked " + str(leagueIdSelected) + ".csv")
-        writeToFile(listOfcountOfplayersPicked, "GW " + str(GWNumber) + " PlayersPicked " + str(leagueIdSelected) + ".csv")
+        writeToFile(listOfCountOfCaptainsPicked, "GW " + str(GWNumber) + " CaptainsPicked " + leagueName + ".csv")
+        writeToFile(listOfcountOfplayersPicked, "GW " + str(GWNumber) + " PlayersPicked " + leagueName + ".csv")
 
 
        	#writeToFile(listOfCountOfCaptainsPicked, "file.xlsx")
@@ -188,5 +198,6 @@ while (True):
         pageCount += 1
 
     except Exception as e:
+        print 'Exception Caught'
         print(e)
         pass
