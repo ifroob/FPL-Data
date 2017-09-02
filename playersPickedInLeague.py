@@ -46,7 +46,7 @@ def getUserEntryIds(league_id, ls_page, league_Standing_Url):
     # print league_url
     r = requests.get(league_url)
     jsonResponse = r.json()
-    print jsonResponse
+    print (jsonResponse)
     standings = jsonResponse["standings"]["results"]
     
     if not standings:
@@ -59,12 +59,12 @@ def getUserEntryIds(league_id, ls_page, league_Standing_Url):
     i = 1
 
     for player in standings:
-    	isNew = player["last_rank"] # JSON field indicating if a player wasn't in the league before
-        print isNew 
+        isNew = player["last_rank"] # JSON field indicating if a player wasn't in the league before
+        print (isNew) 
         if (isNew != 0) :
-	        print (str(i) + ") " + player["player_name"] + ": " + player["entry_name"])
-	        entries.append(player["entry"])
-	        i = i + 1
+            print (str(i) + ") " + player["player_name"] + ": " + player["entry_name"])
+            entries.append(player["entry"])
+            i = i + 1
 
     return entries
 
@@ -90,7 +90,7 @@ def getplayersPickedForEntryId(entry_id, GWNumber):
 
     except ValueError :
     	# Maybe we can do something here where we exclude the team in which it fails on
-	    print 'Decoding failed on ' + str(entry_id)  
+	    print ("Decoding failed on " + str(entry_id))  
     	# print 'Exiting because decoding JSON has failed on team ' + str(entry_id)
     	# sys.exit()
 
@@ -126,10 +126,10 @@ parser = argparse.ArgumentParser(description='Get players picked in your league 
 #parser.add_argument('-gw','--gameweek', help='gameweek number', required=True)
 #parser.add_argument('-t', '--type', help='league type')
 
-print "\n" + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + "\n"
-league = raw_input("Enter League ID (e.g. 5320): ")
-gameweek = raw_input("Enter GW number (e.g. 2): ")
-type = raw_input("Enter league type (classic or h2h): ")
+print ("\n" + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + "\n")
+league = input("Enter League ID (e.g. 5320): ")
+gameweek = input("Enter GW number (e.g. 2): ")
+type = input("Enter league type (classic or h2h): ")
 #args = vars(parser.parse_args())
 
 getPlayersInfo()
@@ -153,7 +153,7 @@ else:
     print("Classic league mode")
 
 leagueName = getLeagueInfo(leagueIdSelected, leagueStandingUrl)
-print "\n\t\t" + leagueName + "\n"
+print ("\n\t\t" + leagueName + "\n")
 
 # Grab data from the full link as specified
 while (True):
@@ -198,6 +198,6 @@ while (True):
         pageCount += 1
 
     except Exception as e:
-        print 'Exception Caught'
+        print ("Exception Caught")
         print(e)
         pass
