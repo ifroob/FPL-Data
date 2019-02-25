@@ -22,50 +22,51 @@ PLAYERS_INFO_URL = FPL_URL + PLAYERS_INFO_SUBURL
 START_PAGE = 1
 
 
-def getLeagueInfo(league_id,league_Standing_Url) :
-	league_url = league_Standing_Url + str(league_id) 
-	r = requests.get(league_url)
-	jsonResponse = r.json()
+def getJSONResponseFrom(url):
+	jsonResponse = requests.get(url).json()
+	return jsonResponse
+
+def getLeagueInfo(leagueID, leagueStandingUrl) :
+	leagueURL = leagueStandingUrl + str(leagueID) 
+	jsonResponse = requests.get(leagueURL).json()
 	#print jsonResponse
 	leagueName = jsonResponse["league"]["name"]
 	return leagueName
 
-
 # Download all player data: https://fantasy.premierleague.com/drf/bootstrap-static
 def getPlayersInfo():
-    r = requests.get(PLAYERS_INFO_URL)
-    jsonResponse = r.json()
+    jsonResponse = requests.get(PLAYERS_INFO_URL).json()
     with open(PLAYERS_INFO_FILENAME, 'w') as outfile:
         json.dump(jsonResponse, outfile)
 
+# Read player info from the downloaded file
+def getAllPlayersDetailedJson():
+    getPlayersInfo()
+    with open(PLAYERS_INFO_FILENAME) as json_data:
+        d = json.load(json_data)
+        return d
 
 # Get users in league: https://fantasy.premierleague.com/drf/leagues-classic-standings/336217?phase=1&le-page=1&ls-page=5
-def getUserEntryIds(league_id, ls_page, league_Standing_Url):
+def getUserIDs(leagueID, pageNumber, leagueStandingURL):
 	# Get the URL from the PRESENT league standings.  This causes a problem whenever new users come into the league later on
-    league_url = league_Standing_Url + str(league_id) + "?phase=1&le-page=1&ls-page=" + str(ls_page)
-    # print league_url
-    r = requests.get(league_url)
-    jsonResponse = r.json()
-    print (jsonResponse)
-    standings = jsonResponse["standings"]["results"]
-    
-    if not standings:
+    # https://fantasy.premierleague.com/a/leagues/standings/153201/classic?phase=1&lsPage=2&lePage=1
+    # https://fantasy.premierleague.com/a/leagues/standings/153201/classic?phase=1&lsPage=3&lePage=1
+    leagueURL = leagueStandingURL + str(leagueID) + "?phase=1&le-page=1&" + "ls-page=" + str(pageNumber)
+    print (leagueURL)
+    jsonResponse = requests.get(leagueURL).json()
+    leagueStandings = jsonResponse["standings"]["results"] 
+    if not leagueStandings:
         print("\nSuccess: Finished looking through all of the standings!")
         return None
 
     entries = []
-
-    # print standings
-    i = 1
-
-    for player in standings:
-        isNew = player["last_rank"] # JSON field indicating if a player wasn't in the league before
-        print (isNew) 
-        if (isNew != 0) :
-            print (str(i) + ") " + player["player_name"] + ": " + player["entry_name"])
+    for player in leagueStandings:
+        playerIsNotNew = player["last_rank"] # JSON field indicating if a player wasn't in the league before
+        print (playerIsNotNew) 
+        if (playerIsNotNew):
+            print ("Entrant " + player["player_name"] + ": " + player["entry_name"])
             entries.append(player["entry"])
-            i = i + 1
-
+         
     return entries
 
 
@@ -95,12 +96,6 @@ def getplayersPickedForEntryId(entry_id, GWNumber):
     	# sys.exit()
 
 
-# read player info from the json file that we downlaoded
-def getAllPlayersDetailedJson():
-    with open(PLAYERS_INFO_FILENAME) as json_data:
-        d = json.load(json_data)
-        return d
-
 # writes the results to csv file
 def writeToFile(countOfplayersPicked, fileName):
     with open(fileName, 'w') as out:
@@ -120,84 +115,85 @@ def writeToFile(countOfplayersPicked, fileName):
             csv_out.writerow(row)
 
 # Main Script
+def main():
+	parser = argparse.ArgumentParser(description='Get players picked in your league in a certain GameWeek')
+	print ("\n" + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + "\n")
+	
+	# 517116
+	leagueID = input("Enter League ID (e.g. 517116): ")
+	# 1
+	gameweek = input("Enter GW number (e.g. 2): ")
+	# classic
+	leagueType  = input("Enter league type (classic or h2h): ")
+	
+	playerElementIdToNameMap = {}
+	allPlayers = getAllPlayersDetailedJson()
+	for element in allPlayers["elements"]:
+		playerName = element["second_name"] + ", " + element["first_name"]
+		playerElementIdToNameMap[element["id"]] = playerName
 
-parser = argparse.ArgumentParser(description='Get players picked in your league in a certain GameWeek')
-#parser.add_argument('-l','--league', help='league entry id', required=True)
-#parser.add_argument('-gw','--gameweek', help='gameweek number', required=True)
-#parser.add_argument('-t', '--type', help='league type')
+	# print(playerElementIdToNameMap)
+	countOfPlayersPicked = {}
+	countOfCaptainsPicked = {}
+	totalNumberOfPlayersCount = 0
+	pageCount = 1
 
-print ("\n" + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + "\n")
-league = input("Enter League ID (e.g. 5320): ")
-gameweek = input("Enter GW number (e.g. 2): ")
-type = input("Enter league type (classic or h2h): ")
-#args = vars(parser.parse_args())
+	if leagueType == "h2h":
+	    leagueStandingUrl = FPL_URL + LEAGUE_H2H_STANDING_SUBURL
+	    print("H2H league")
+	else:
+	    leagueStandingUrl = FPL_URL + LEAGUE_CLASSIC_STANDING_SUBURL
+	    print("Classic league mode")
 
-getPlayersInfo()
-playerElementIdToNameMap = {}
-allPlayers = getAllPlayersDetailedJson()
-for element in allPlayers["elements"]:
-    playerElementIdToNameMap[element["id"]] = element["web_name"].encode('ascii', 'ignore')
+	leagueName = getLeagueInfo(leagueID, leagueStandingUrl)
+	print ("\n\t\t" + leagueName + "\n")
 
-countOfplayersPicked = {}
-countOfCaptainsPicked = {}
-totalNumberOfPlayersCount = 0
-pageCount = START_PAGE
-GWNumber = gameweek
-leagueIdSelected = league
+	# Grab data from the full link as specified
+	while (True):
+	    try:
+	        entries = getUserIDs(leagueID, pageCount, leagueStandingUrl)
+	        print (entries)
+	        if (not entries):
+	            break
 
-if type == "h2h":
-    leagueStandingUrl = FPL_URL + LEAGUE_H2H_STANDING_SUBURL
-    print("H2H league")
-else:
-    leagueStandingUrl = FPL_URL + LEAGUE_CLASSIC_STANDING_SUBURL
-    print("Classic league mode")
+	        totalNumberOfPlayersCount += len(entries)
+	        print("\npageCount: " + str(pageCount) + " total number of players: " + str(totalNumberOfPlayersCount))
+	        break	        
+	#         # Goes through each player id and finds team
 
-leagueName = getLeagueInfo(leagueIdSelected, leagueStandingUrl)
-print ("\n\t\t" + leagueName + "\n")
+	#         for entry in entries:
+	#             elements, captainId = getplayersPickedForEntryId(entry, GWNumber)
+	#             for element in elements:
+	#                 name = playerElementIdToNameMap[element]
+	#                 if name in countOfplayersPicked:
+	#                     countOfplayersPicked[name] += 1
+	#                 else:
+	#                     countOfplayersPicked[name] = 1
 
-# Grab data from the full link as specified
-while (True):
-    try:
-        entries = getUserEntryIds(leagueIdSelected, pageCount, leagueStandingUrl)
-        # print entries
-        if entries is None:
-     		# no more players to look at
-            break
+	#             captainName = playerElementIdToNameMap[captainId]
+	#             if captainName in countOfCaptainsPicked:
+	#                 countOfCaptainsPicked[captainName] += 1
+	#             else:
+	#                 countOfCaptainsPicked[captainName] = 1
 
-        totalNumberOfPlayersCount += len(entries)
-        print("\npageCount: " + str(pageCount) + " total number of players: " + str(totalNumberOfPlayersCount))
-        
-        # Goes through each player id and finds team
+	        
 
-        for entry in entries:
-            elements, captainId = getplayersPickedForEntryId(entry, GWNumber)
-            for element in elements:
-                name = playerElementIdToNameMap[element]
-                if name in countOfplayersPicked:
-                    countOfplayersPicked[name] += 1
-                else:
-                    countOfplayersPicked[name] = 1
+	#         listOfCountOfCaptainsPicked = sorted(countOfCaptainsPicked.items(), key=lambda x: x[1], reverse=True)
+	#         listOfcountOfplayersPicked = sorted(countOfplayersPicked.items(), key=lambda x: x[1], reverse=True)
 
-            captainName = playerElementIdToNameMap[captainId]
-            if captainName in countOfCaptainsPicked:
-                countOfCaptainsPicked[captainName] += 1
-            else:
-                countOfCaptainsPicked[captainName] = 1
-
-        
-
-        listOfCountOfCaptainsPicked = sorted(countOfCaptainsPicked.items(), key=lambda x: x[1], reverse=True)
-        listOfcountOfplayersPicked = sorted(countOfplayersPicked.items(), key=lambda x: x[1], reverse=True)
-
-        writeToFile(listOfCountOfCaptainsPicked, "GW " + str(GWNumber) + " CaptainsPicked " + leagueName + ".csv")
-        writeToFile(listOfcountOfplayersPicked, "GW " + str(GWNumber) + " PlayersPicked " + leagueName + ".csv")
+	#         writeToFile(listOfCountOfCaptainsPicked, "GW " + str(GWNumber) + " CaptainsPicked " + leagueName + ".csv")
+	#         writeToFile(listOfcountOfplayersPicked, "GW " + str(GWNumber) + " PlayersPicked " + leagueName + ".csv")
 
 
-       	#writeToFile(listOfCountOfCaptainsPicked, "file.xlsx")
+	#        	#writeToFile(listOfCountOfCaptainsPicked, "file.xlsx")
 
-        pageCount += 1
+	#         pageCount += 1
 
-    except Exception as e:
-        print ("Exception Caught")
-        print(e)
-        pass
+	    except Exception as e:
+	        print ("Exception Caught")
+	        print(e)
+	        pass
+
+# Start
+if __name__ == '__main__':
+	main()
